@@ -1,0 +1,37 @@
+---
+  - block:
+      - name: "Check if Sumo Logic Collector exists {{ collector_directory }}/collector"
+        stat:
+          path: "{{ collector_directory }}/collector"
+        register: sumo_logic_check
+
+    become: true
+    tags: [always]
+
+  - block:
+      - name: "Install Sumo Logic Collector {{ collector_directory }}"
+        import_tasks: install-collector.yml
+        when: not sumo_logic_check.stat.exists
+        tags: [sumo.logic.collector.install]
+
+      - name: "Ensure previous configurations do not exist {{ sumologic.sources_directory }}"
+        file:
+          path: "{{ item }}"
+          state: absent
+        with_items:
+          - "{{ sumologic.sources_directory }}"
+          - "{{ sumologic.configuration_directory }}/user.properties"
+        when: sumo_logic_check.stat.exists
+        tags: [always]
+
+      - name: "Create sources Directory at {{ sumologic.sources_directory }}"
+        file:
+          path: "{{ sumologic.sources_directory }}"
+          state: directory
+        register: sources_directory
+
+      - name: Configure Sumo Logic Collector
+        import_tasks: configure-collector.yml
+        tags: [sumo.logic.collector.configuration]
+
+    become: true

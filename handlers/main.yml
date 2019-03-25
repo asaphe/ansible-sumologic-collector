@@ -1,0 +1,13 @@
+---
+  - block:
+      - name: start collector.service
+        service:
+          name: collector.service
+          state: started
+
+      - name: restart collector.service
+        service:
+          name: collector.service
+          state: restarted
+
+    become: true

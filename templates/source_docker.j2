@@ -1,0 +1,50 @@
+{
+  "api.version":"v1",
+  "sources":[
+    {%- for source in sources -%}
+    {
+      "sourceType":"{{ source.type }}",
+      "category":"{{ source.category }}",
+      "uri":"{{ source.uri }}",
+      {%- if source.containers is defined -%}
+      "specifiedContainers":["{{ source.containers | join('","') }}"],
+      "allContainers":false,
+      {%- else -%}
+      "allContainers":true,
+      {%- endif -%}
+      {% if source.type is defined and source.type == 'DockerStats' -%}
+      "metrics": "[{% if source.metrics is defined -%}"{{ source.metrics | join('","') }}"{% endif -%}]",
+      {%- endif -%}
+      "filters":[
+      {%- if source.filters is defined -%}
+        {%- for source_filter in source.filters -%}
+        {
+        "name": "{{ source_filter.name }}",
+        "filterType": "{{ source_filter.filtertype }}",
+        "regexp": "{{ source_filter.regexp }}"
+        }{%- if not loop.last -%},{%- endif %}
+        {%- endfor -%}
+      {%- endif -%}
+      ],
+      "name":"{{ source.name }}",
+      "hostName":"{{ ansible_hostname }}"
+      {% if source.type is defined and source.type == 'DockerStats' -%}
+      "multilineProcessingEnabled":false,
+      "useAutolineMatching":false,
+      "automaticDateParsing":false,
+      "contentType":"DockerMetrics"
+      "collectEvents":false,
+      {% elif source.type is defined and source.type == 'DockerLog' -%}
+      "collectEvents":true,
+      {% else -%}
+      "multilineProcessingEnabled":true,
+      "useAutolineMatching":true,
+      "automaticDateParsing":true,
+      {% endif -%}
+      "forceTimeZone":false,
+      "encoding":"UTF-8",
+      "cutoffTimestamp":0
+    }{%- if not loop.last -%},{% endif -%}
+    {%- endfor -%}
+  ]
+}

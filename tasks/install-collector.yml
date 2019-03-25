@@ -1,0 +1,14 @@
+---
+  - block:
+    - name: Get Install Script
+      get_url:
+        url: "{{ sumologic.sh_script_url }}"
+        dest: '/tmp/sumologic_collector.sh'
+        mode: 0500
+        force: yes
+      register: sumologic_collector
+
+    - name: Execute Sumo Logic collector installation script
+      shell: 'bash {{ sumologic_collector.dest }} -q -console -VskipRegistration=true -Vsumo.accessid=tmp -Vsumo.accesskey=tmp -dir {{ collector_directory }}'
+
+    become: true

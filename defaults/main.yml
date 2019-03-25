@@ -1,0 +1,213 @@
+---
+base_path: '/var/log'
+collector_directory: '/opt/SumoCollector'
+
+sumologic:
+  configuration_directory: "{{ collector_directory }}/config"
+  sources_directory: "{{ collector_directory }}/sources"
+  debian_pkg_url: 'https://collectors.us2.sumologic.com/rest/download/deb/64'
+  sh_script_url: 'https://collectors.us2.sumologic.com/rest/download/linux/64'
+  group_name: 'sumologic_collector' # Created by SumoLogic install script
+  api_credentials:
+    accessid: "{{ sumologic_credentials.accessid }}"
+    accesskey: "{{ sumologic_credentials.accesskey }}"
+  fields: # Exception in Jinja for fleet_request instances
+    - key: '_budget'
+      value: "{{ env_ingestbudget|default('default_1_gb') }}"
+  _application_budget_envs: "{{ application_budget_envs|default(['prod','dev']) }}"
+
+log_paths:
+  aws: "{{ base_path }}"
+  system: "{{ base_path }}"
+  security: "{{ base_path }}"
+  jenkins:  "{{ base_path }}/jenkins"
+  sftp: "{{ base_path }}/sftp"
+  datadog: "{{ base_path }}/datadog"
+  nginx: "{{ base_path }}/nginx"
+  letsencrypt: "{{ base_path }}/letsencrypt"
+  docker: "/var/lib/docker/containers/**"
+
+sources_system:
+  - name: syslog
+    category: "{{ env }}/host/var/log/system/syslog"
+    path: "{{ log_paths.system }}"
+    filedescriptor: 'syslog*'
+    filters:
+      - datadog_agent_ssh_banner:
+        name: datadog_agent_ssh_banner
+        filtertype: Exclude
+        regexp: '.*\| Auth banner\:.*'
+      - datadog_agent_transport_info:
+        name: datadog_agent_transport_info
+        filtertype: Exclude
+        regexp: '.*\| INFO \| \(datadog_agent\.go\:137 in LogMessage\) \| \(transport\.py\:1624\).*'
+      - datadog_agent_transport_ssh_version:
+        name: datadog_agent_transport_ssh_version
+        filtertype: Exclude
+        regexp: '.*\| \(transport\.py\:1624\) \| Connected \(version.*'
+  - name: kernlog
+    category: "{{ env }}/host/var/log/system/kernlog"
+    path: "{{ log_paths.system }}"
+    filedescriptor: 'kern.log*'
+  - name: fsck
+    category: "{{ env }}/host/var/log/system/fsck"
+    path: "{{ log_paths.system }}"
+    filedescriptor: 'fsck'
+  - name: aws-agent
+    category: "{{ env }}/host/var/log/system/aws/agent"
+    path: "{{ log_paths.aws }}"
+    filedescriptor: 'awsagent-update.log'
+    multiline: true
+  - name: cloud-init
+    category: "{{ env }}/host/var/log/system/aws/cloudinit"
+    path: "{{ log_paths.aws }}"
+    filedescriptor: 'cloud-init*.log'
+    multiline: true
+  - name: datadog-agent
+    category: "{{ env }}/datadog/agent/log"
+    path: "{{ log_paths.datadog }}"
+    filedescriptor: '*.log*'
+    multiline: true
+    filters:
+      - datadog_agent_ssh_banner:
+        name: datadog_agent_ssh_banner
+        filtertype: Exclude
+        regexp: '(?s).*\| Auth banner\:.*(?s)'
+      - datadog_agent_transport_info:
+        name: datadog_agent_transport_info
+        filtertype: Exclude
+        regexp: '(?s).*\| INFO \| \(datadog_agent\.go\:137 in LogMessage\) \| \(transport\.py\:1624\).*(?s)'
+      - datadog_agent_transport_ssh_version:
+        name: datadog_agent_transport_ssh_version
+        filtertype: Exclude
+        regexp: '(?s).*\| \(transport\.py\:1624\) \| Connected \(version.*(?s)'
+
+sources_system_packages:
+  - name: apt
+    category: "{{ env }}/host/var/log/system/apt"
+    path: "{{ log_paths.system }}"
+    filedescriptor: 'apt'
+  - name: distupgrade
+    category: "{{ env }}/host/var/log/system/distupgrade"
+    path: "{{ log_paths.system }}"
+    filedescriptor: 'dist-upgrade'
+  - name: unattendedupgrades
+    category: "{{ env }}/host/var/log/system/unattendedupgrades"
+    path: "{{ log_paths.system }}"
+    filedescriptor: 'unattended-upgrades'
+  - name: alternatives
+    category: "{{ env }}/host/var/log/system/alternatives"
+    path: "{{ log_paths.system }}"
+    filedescriptor: 'alternatives.log*'
+  - name: dpkg
+    category: "{{ env }}/host/var/log/system/dpkg"
+    path: "{{ log_paths.system }}"
+    filedescriptor: 'dpkg.log*'
+
+sources_security:
+  - name: lynis
+    category: "{{ env }}/host/var/log/security/lynis"
+    path: "{{ log_paths.security }}"
+    filedescriptor: 'lynis.log'
+    multiline: true
+    filters:
+      - authorized_keys:
+        name: "authorized_keys"
+        filtertype: "Exclude"
+        regexp: '(?s).*%h/.ssh/authorized_keys.*(?s)'
+  - name: fail2ban
+    category: "{{ env }}/host/var/log/security/fail2ban"
+    path: "{{ log_paths.security }}"
+    filedescriptor: 'fail2ban.log'
+  - name: authlog
+    category: "{{ env }}/host/var/log/security/authlog"
+    path: "{{ log_paths.security }}"
+    filedescriptor: 'auth.log*'
+
+sources_nginx:
+  - name: letsencrypt
+    category: "{{ env }}/host/letsencrypt/log"
+    path: "{{ log_paths.letsencrypt }}"
+    filedescriptor: 'letsencrypt.log*'
+  - name: nginx
+    category: "{{ env }}/host/nginx/log"
+    path: "{{ log_paths.nginx }}"
+    filedescriptor: '*.log*'
+
+sources_sftp:
+  - name: sftp
+    category: "{{ env }}/host/sftp/log"
+    path: "{{ log_paths.sftp }}"
+    filedescriptor: '*.log*'
+
+sources_jenkins:
+  - name: jenkins
+    category: "{{ env }}/host/jenkins/log"
+    path: "{{ log_paths.jenkins }}"
+    filedescriptor: 'jenkins.log'
+    multiline: true
+    filters:
+      - google_local_cache:
+        name: google_local_cache
+        filtertype: "Exclude"
+        regexp: "(?s).*com.google.common.cache.CacheLoader.*(?s)"
+      - blueocean_pipeline_eventlistener:
+        name: blueocean_pipeline_eventlistener
+        filtertype: "Exclude"
+        regexp: "(?s).*io.jenkins.blueocean.events.PipelineEventListener.*(?s)"
+      - blueocean_msg_enricher:
+        name: blueocean_msg_enricher
+        filtertype: "Exclude"
+        regexp: "(?s).*Event enrichment failure due to unexpected exception in io.jenkins.blueocean.events.BlueMessageEnricher.*(?s)"
+      - durabletask_isalive:
+        name: durabletask_isalive
+        filtertype: "Exclude"
+        regexp: "(?s).*org.jenkinsci.plugins.durabletask.ProcessLiveness isAlive.*(?s)"
+      - async_periodicwork:
+        name: async_periodicwork
+        filtertype: "Exclude"
+        regexp: "(?s).*hudson.model.AsyncPeriodicWork.*(?s)"
+      - slack_post_success:
+        name: slack_post_success
+        filtertype: "Exclude"
+        regexp: "(?s).*INFO.*Posting succeeded.*(?s)"
+  - name: jenkins_auth
+    category: "{{ env }}/host/jenkins/security/auth/log"
+    path: "{{ log_paths.jenkins }}"
+    filedescriptor: 'audit.log*'
+
+sources_docker_json_log:
+  - name: docker-json-log
+    category: "{{ env }}/host/docker/json/log"
+    path: "{{ log_paths.docker }}"
+    filedescriptor: '*-json.log'
+    filters:
+      - application_healthcheck:
+        name: application_healthcheck
+        filtertype: "Exclude"
+        regexp: "(?s).*health-check.*(?s)"
+
+sources_docker_log:
+  - name: docker-socket-log
+    type: 'DockerLog'
+    category: "{{ env }}/host/docker/socket/log"
+    uri: 'unix:///var/run/docker.sock'
+    containers:
+      - '!health_check_stack_ok_*'
+
+source_docker_stats:
+  - name: docker-socket-stats
+    type: 'DockerStats'
+    category: "{{ env }}/host/docker/socket/stats"
+    uri: 'unix:///var/run/docker.sock'
+    containers:
+      - '!health_check_stack_ok_*'
+    filters:
+      - stats_rate_limit:
+        name: StatsRateLimiter
+        filtertype: Include
+        regexp: "(.*\\{\\\"read\\\":\\\"\\d{4}-\\d{2}-\\w{5}:\\d{2}:[0][0|1|2].*)"
+
+sources_metrics:
+  - name: metrics
+    interval: 60000

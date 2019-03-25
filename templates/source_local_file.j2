@@ -1,0 +1,36 @@
+{
+  "api.version":"v1",
+  "sources":[
+    {% for source in sources -%}
+    {
+      "sourceType":"LocalFile",
+      "category":"{{ source.category }}",
+      "pathExpression":"{{ source.path }}/{{ source.filedescriptor }}",
+      "blacklist":[{%- if source.blacklist is defined %}"{{ source.blacklist | join('","') }}"{% endif -%}],
+      "filters":[
+      {%- if source.filters is defined -%}
+        {%- for source_filter in source.filters -%}
+        {
+        "name": "{{ source_filter.name }}",
+        "filterType": "{{ source_filter.filtertype }}",
+        "regexp": "{{ source_filter.regexp }}"
+        }{%- if not loop.last -%},{%- endif %}
+        {%- endfor -%}
+      {%- endif -%}
+      ],
+      "name":"{{ source.name }}",
+      "hostName":"{{ ansible_hostname }}",
+      "automaticDateParsing":true,
+      "useAutolineMatching":true,
+      {%- if source.multiline is defined and source.multiline %}
+      "multilineProcessingEnabled":true,
+      {%- else %}
+      "multilineProcessingEnabled":false,
+      {%- endif %}
+      "forceTimeZone":false,
+      "encoding":"UTF-8",
+      "cutoffTimestamp":0
+    }{%- if not loop.last -%},{%- endif -%}
+    {%- endfor -%}
+  ]
+}

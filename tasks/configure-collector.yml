@@ -1,0 +1,135 @@
+---
+  - name: Stat local binaries
+    block:
+      - name: Check if Docker Engine exists
+        stat:
+          path: '/var/run/docker.sock'
+        register: docker_sock
+
+      - name: Check if Jenkins Home exists
+        stat:
+          path: '/var/lib/jenkins'
+        register: jenkins_home
+        when: '"jenkins" in inventory_hostname'
+
+      - name: Check if Nginx pid file exits
+        stat:
+          path: '/run/nginx.pid'
+        register: nginx
+
+    become: true
+
+  - name: Configure sources
+    block:
+      - name: Template Metrics sources
+        template:
+          src: "{{ role_path }}/templates/source_metrics.j2"
+          dest: "{{ sumologic.sources_directory }}/source_metrics.json"
+          force: yes
+          lstrip_blocks: no
+          trim_blocks: no
+        when: not skip_metrics|default(true)
+
+      - name: Template JSON system sources
+        vars:
+          sources: "{{ sources_system }}"
+        template:
+          src: "{{ role_path }}/templates/source_local_file.j2"
+          dest: "{{ sumologic.sources_directory }}/source_local_file_system.json"
+          force: yes
+          lstrip_blocks: no
+          trim_blocks: no
+
+      - name: Template JSON security sources
+        vars:
+          sources: "{{ sources_security }}"
+        template:
+          src: "{{ role_path }}/templates/source_local_file.j2"
+          dest: "{{ sumologic.sources_directory }}/source_local_file_security.json"
+          force: yes
+          lstrip_blocks: no
+          trim_blocks: no
+
+      - name: Template JSON Docker socket sources
+        vars:
+          sources: "{{ sources_docker_log  }}"
+        template:
+          src: "{{ role_path }}/templates/{{ item }}.j2"
+          dest: "{{ sumologic.sources_directory }}/{{ item }}.json"
+          force: yes
+          lstrip_blocks: no
+          trim_blocks: no
+        with_items:
+          - 'source_docker'
+        when: docker_sock.stat.exists and configure_docker_sock | default(false)
+
+      - name: Template JSON Docker file sources (for app logs)
+        vars:
+          sources: "{{ sources_docker_json_log  }}"
+        template:
+          src: "{{ role_path }}/templates/source_local_file_docker.j2"
+          dest: "{{ sumologic.sources_directory }}/source_local_file_docker.json"
+          force: yes
+          lstrip_blocks: no
+          trim_blocks: no
+        when: docker_sock.stat.exists
+
+      - name: Template JSON Jenkins sources
+        vars:
+          sources: "{{ sources_jenkins }}"
+        template:
+          src: "{{ role_path }}/templates/source_local_file.j2"
+          dest: "{{ sumologic.sources_directory }}/source_local_file_jenkins.json"
+          force: yes
+          lstrip_blocks: no
+          trim_blocks: no
+        when: '"jenkins" in inventory_hostname and jenkins_home.stat.exists'
+
+      - name: Template JSON nginx source
+        vars:
+          sources: "{{ sources_nginx }}"
+        template:
+          src: "{{ role_path }}/templates/source_local_file.j2"
+          dest: "{{ sumologic.sources_directory }}/source_local_file_nginx.json"
+          force: yes
+          lstrip_blocks: no
+          trim_blocks: no
+        when: nginx.stat.exists
+
+      - name: Template JSON SFTP sources
+        vars:
+          sources: "{{ sources_sftp }}"
+        template:
+          src: "{{ role_path }}/templates/source_local_file.j2"
+          dest: "{{ sumologic.sources_directory }}/source_local_file_sftp.json"
+          force: yes
+          lstrip_blocks: no
+          trim_blocks: no
+        when: '"sftp" in inventory_hostname'
+
+    become: true
+    tags: [sumo.logic.collector.templates]
+
+  - name: Configure and start Sumo Logic Collector
+    block:
+      - name: Template 'user.properties' file
+        template:
+          src: user.properties.j2
+          dest: "{{ sumologic.configuration_directory }}/user.properties"
+          force: yes
+
+      - name: Ensure Sumo Logic Collector directories are owned by grp:(sumologic_collector)
+        file:
+          path: "{{ sumologic.sources_directory }}"
+          group: "{{ sumologic.group_name }}"
+          recurse: yes
+
+      - name: Restart Sumo Logic Collector service
+        systemd:
+          name: collector.service
+          state: restarted
+          daemon_reload: yes
+          enabled: yes
+
+    become: true
+    tags: [sumo.logic.collector.config]

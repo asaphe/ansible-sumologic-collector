@@ -1,0 +1,14 @@
+{
+  "api.version":"v1",
+  "sources":[
+    {% for source in sources_metrics -%}
+    {
+      "sourceType":"SystemStats",
+      "name":"{{ source.name }}",
+      "hostName":"{{ ansible_hostname }}",
+      "interval":60000,
+      "metrics":[{%- if source.metrics is defined -%}"{{ source.metrics | join('","') }}"{%- endif -%}]
+    }{%- if not loop.last -%},{%- endif -%}
+    {%- endfor -%}
+  ]
+}

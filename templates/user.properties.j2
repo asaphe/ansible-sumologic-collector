@@ -1,0 +1,34 @@
+name = {{ env }} {{ ansible_hostname }}
+hostName = {{ ansible_hostname }}
+{% if hostvars[inventory_hostname]['ec2_tag_aws_ec2spot_fleet_request_id'] is defined or 'swarm-servers' in group_names -%}
+description = {{ env }} {{ hostvars[inventory_hostname]['ec2_tag_Service'] }} {{ ansible_hostname }} Collector
+{% else -%}
+description = {{ env }} {{ ansible_hostname }} Collector
+{% endif -%}
+accessid = {{ sumologic.api_credentials.accessid }}
+accesskey = {{ sumologic.api_credentials.accesskey }}
+syncSources = {{ sumologic.sources_directory }}
+{% if hostvars[inventory_hostname]['ec2_tag_aws_ec2spot_fleet_request_id'] is defined -%}
+ephemeral = true
+{% else -%}
+ephemeral = false
+{% endif -%}
+clobber = true
+disableActionSource = true
+disableScriptSource = true
+disableUpgrade = false
+skipAccessKeyRemoval = false
+targetCPU = 20
+{% if sumologic.fields is defined -%}
+  {% if (env in sumologic['_application_budget_envs']) and hostvars[inventory_hostname]['ec2_tag_aws_ec2spot_fleet_request_id'] is defined and 'swarm-servers' in group_names -%}
+    {% for item in sumologic.fields -%}
+    {# Comma seperated list of key=value #}
+fields = [{{ item['key']+'='+app_ingestbudget+',' if not loop.last else item['key']+'='+app_ingestbudget+']'}}
+    {%- endfor -%}
+  {% endif %}
+{% else %}
+    {% for item in sumologic.fields -%}
+    {# Comma seperated list of key=value #}
+fields = [{{ item['key']+'='+item['value']+',' if not loop.last else item['key']+'='+item['value']+']'}}
+    {%- endfor -%}
+{%- endif -%}
